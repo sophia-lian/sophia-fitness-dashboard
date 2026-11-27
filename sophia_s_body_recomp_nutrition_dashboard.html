@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOPHIA'S BODY RECOMP & NUTRITION DASHBOARD</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Google Fonts: Noto Sans TC 與 Plus Jakarta Sans 呈現精緻排版 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-cream: #F5F3EE;
+            --card-surface: #FAF9F6;
+            --card-border: #E5E0D8;
+            --morandi-green: #3B5242;
+            --morandi-green-dark: #2C3E32;
+            --morandi-mint-bg: #EAF0EC;
+            --morandi-mint-border: #CFE0D5;
+            --sand-pill: #EBE6DD;
+            --text-primary: #232A25;
+            --text-secondary: #68706A;
+        }
+
+        body {
+            background-color: #E8E4DC;
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+            color: var(--text-primary);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 手機版卡片容器模擬 */
+        .app-shell {
+            background-color: var(--bg-cream);
+            max-width: 480px;
+            min-height: 100vh;
+            margin: 0 auto;
+            box-shadow: 0 20px 50px rgba(35, 42, 37, 0.08);
+        }
+
+        .surface-card {
+            background-color: var(--card-surface);
+            border: 1px solid var(--card-border);
+            border-radius: 22px;
+            box-shadow: 0 4px 16px rgba(59, 82, 66, 0.03);
+        }
+
+        .mint-card {
+            background-color: var(--morandi-mint-bg);
+            border: 1px solid var(--morandi-mint-border);
+            border-radius: 20px;
+        }
+
+        .hero-card {
+            background: linear-gradient(145deg, #3F5747 0%, #334739 100%);
+            border-radius: 22px;
+            color: #FAF9F6;
+            box-shadow: 0 10px 24px rgba(59, 82, 66, 0.18);
+        }
+
+        /* 隱藏捲軸但保留橫向滑動能力 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* 平滑進度條動畫 */
+        .progress-fill {
+            transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* 頁籤切換淡入動畫 */
+        .tab-panel {
+            animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-[#3B5242] selection:text-white">
+
+    <!-- 全域提示訊息 Toast (取代 alert) -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2">
+        <div class="bg-[#2C3E32] text-[#FAF9F6] px-4 py-2.5 rounded-full shadow-lg text-xs font-medium flex items-center gap-2 border border-white/10">
+            <span id="toast-icon">✨</span>
+            <span id="toast-msg">已更新紀錄</span>
+        </div>
+    </div>
+
+    <!-- 體重／體脂快速更新彈窗 Modal -->
+    <div id="weight-modal" class="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 hidden items-center justify-center p-4">
+        <div class="bg-[#FAF9F6] border border-[#E5E0D8] rounded-3xl max-w-sm w-full p-5 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-base text-[#232A25]">⚖️ 紀錄今日空腹體態數據</h3>
+                <button onclick="closeWeightModal()" class="w-8 h-8 rounded-full bg-[#EBE6DD] flex items-center justify-center text-sm text-[#68706A] hover:text-[#232A25]">✕</button>
+            </div>
+            <p class="text-xs text-[#68706A] mb-4 leading-relaxed">
+                建議早上起床如廁後測量。體重在 48.5–50 kg 之間浮動屬於正常水分變化，不用焦慮喔！
+            </p>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-[#3B5242] mb-1">今日體重 (kg)</label>
+                    <input type="number" step="0.1" id="modal-weight-input" class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#E5E0D8] text-base font-bold text-[#232A25] focus:outline-none focus:border-[#3B5242]" placeholder="例如 48.8">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#3B5242] mb-1">體脂率 (%) <span class="font-normal text-[#68706A]">- 選填</span></label>
+                    <input type="number" step="0.1" id="modal-bf-input" class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#E5E0D8] text-base font-bold text-[#232A25] focus:outline-none focus:border-[#3B5242]" placeholder="例如 30.5">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-5">
+                <button onclick="closeWeightModal()" class="flex-1 py-2.5 rounded-xl bg-[#EBE6DD] text-[#68706A] text-xs font-semibold">取消</button>
+                <button onclick="saveWeightFromModal()" class="flex-1 py-2.5 rounded-xl bg-[#3B5242] text-white text-xs font-semibold shadow-sm hover:bg-[#2C3E32]">儲存並更新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主應用程式外殼 -->
+    <div class="app-shell px-4 pt-5 pb-12">
+
+        <!-- 頂部狀態卡片 (對齊參考圖上半部結構) -->
+        <header class="surface-card p-4 mb-4">
+            <!-- 第一列：版本標籤與日期 -->
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-3.5 rounded-full bg-[#7A8F80] inline-block shrink-0"></span>
+                    <span class="text-[11px] font-bold tracking-wider text-[#5A655D] uppercase leading-tight">
+                        SOPHIA'S RECOMP &amp;<br>WELLNESS · V1.0
+                    </span>
+                </div>
+                <div class="bg-[#EAF0EC] border border-[#CFE0D5] px-3 py-1.5 rounded-2xl text-right shrink-0">
+                    <div id="header-date" class="text-xs font-bold text-[#3B5242]">2026/11/27</div>
+                    <div id="header-day" class="text-[11px] font-medium text-[#5A655D]">週五 · 體態雕塑模式</div>
+                </div>
+            </div>
+
+            <!-- 主標題 -->
+            <h1 class="text-[19px] font-bold tracking-tight text-[#1E2420] mb-3.5">
+                專屬體態雕塑與健康飲食儀表板
+            </h1>
+
+            <!-- 深莫蘭迪綠核心數據卡 (Hero Card) -->
+            <div class="hero-card p-4 mb-3.5 relative overflow-hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-xs font-medium text-[#DCE6DF] flex items-center gap-1.5">
+                        <span>🏆</span>
+                        <span>今日空腹體態追蹤（線條雕塑期）</span>
+                    </div>
+                    <button onclick="openWeightModal()" class="text-[11px] bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-full transition flex items-center gap-1">
+                        <span>✎ 記錄體重</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                    <!-- 左側體重與體脂 -->
+                    <div class="flex-1">
+                        <div class="flex items-baseline flex-wrap gap-x-2">
+                            <span id="hero-weight" class="text-3xl font-extrabold tracking-tight">49.0</span>
+                            <span class="text-sm font-semibold text-[#DCE6DF]">kg</span>
+                            <span id="hero-diff" class="text-xs font-medium text-[#B8D4C2]">(目標 47.8 kg)</span>
+                        </div>
+                        <div class="mt-2 pt-2 border-t border-white/15 flex items-center gap-3">
+                            <div>
+                                <span class="text-[11px] text-[#B8D4C2] block">目前體脂率</span>
+                                <span id="hero-bf" class="text-xl font-bold">31.0%</span>
+                            </div>
+                            <div class="h-6 w-[1px] bg-white/20"></div>
+                            <div>
+                                <span class="text-[11px] text-[#B8D4C2] block">理想體態區間</span>
+                                <span class="text-xs font-semibold text-white">25% – 27%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右側 BMI 與體態策略小框 -->
+                    <div class="bg-white/12 border border-white/15 rounded-2xl p-3 text-right min-w-[118px] shrink-0">
+                        <div class="text-sm font-bold text-white">BMI <span id="hero-bmi">18.7</span></div>
+                        <div class="text-[11px] text-[#DCE6DF] mt-1 leading-snug">
+                            標準纖細體型<br>
+                            <span class="text-[#A8D5B8] font-semibold">重增肌降脂</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 雙模式熱量與蛋白質建議膠囊 -->
+            <div class="space-y-2">
+                <div class="bg-[#F7F5F0] border border-[#E6E1D8] rounded-full px-3.5 py-2 flex items-center justify-between text-xs">
+                    <span class="font-medium text-[#3B443E]">💃 跳舞／運動日建議</span>
+                    <span class="font-bold text-[#232A25]">1,550 kcal · <span class="text-[#3B5242]">蛋白質 95g</span></span>
+                </div>
+                <div class="bg-[#F7F5F0] border border-[#E6E1D8] rounded-full px-3.5 py-2 flex items-center justify-between text-xs">
+                    <span class="font-medium text-[#3B443E]">🌿 平日／辦公日建議</span>
+                    <span class="font-bold text-[#232A25]">1,350 kcal · <span class="text-[#3B5242]">蛋白質 90g</span></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 四大功能導覽頁籤列 -->
+        <nav class="bg-[#EBE6DD] p-1.5 rounded-2xl grid grid-cols-4 gap-1 mb-4 border border-[#E0D9CE]">
+            <button onclick="switchTab('daily')" id="tab-btn-daily" class="tab-btn active bg-[#FAF9F6] text-[#232A25] shadow-xs rounded-xl py-2 px-1 text-center transition">
+                <div class="text-sm mb-0.5">📊</div>
+                <div class="text-[11px] font-bold leading-tight">今日結算<br>與配餐器</div>
+            </button>
+            <button onclick="switchTab('trend')" id="tab-btn-trend" class="tab-btn text-[#68706A] hover:text-[#232A25] rounded-xl py-2 px-1 text-center transition">
+                <div class="text-sm mb-0.5">📈</div>
+                <div class="text-[11px] font-semibold leading-tight">7日體重<br>與體態藍圖</div>
+            </button>
+            <button onclick="switchTab('workout')" id="tab-btn-workout" class="tab-btn text-[#68706A] hover:text-[#232A25] rounded-xl py-2 px-1 text-center transition">
+                <div class="text-sm mb-0.5">💃</div>
+                <div class="text-[11px] font-semibold leading-tight">舞蹈瑜珈<br>活動表現</div>
+            </button>
+            <button onclick="switchTab('report')" id="tab-btn-report" class="tab-btn text-[#68706A] hover:text-[#232A25] rounded-xl py-2 px-1 text-center transition">
+                <div class="text-sm mb-0.5">📱</div>
+                <div class="text-[11px] font-semibold leading-tight">一鍵生成<br>日報小卡</div>
+            </button>
+        </nav>
+
+        <!-- ==================== 分頁 1：今日結算與配餐器 ==================== -->
+        <main id="panel-daily" class="tab-panel space-y-4">
+
+            <!-- 跨日熱量平衡追蹤卡片 (薄荷綠底色) -->
+            <section class="mint-card p-4">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <h2 class="text-sm font-bold text-[#233329] leading-snug">
+                        🍃 跨日熱量平衡追蹤<br>
+                        <span class="text-xs font-semibold text-[#3B5242]">（無罪惡感彈性飲食）</span>
+                    </h2>
+                    <span id="balance-badge" class="bg-[#3B5242] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-xl shrink-0">
+                        淨平衡 -20 kcal ✓
+                    </span>
+                </div>
+                <p id="balance-desc" class="text-xs text-[#34463B] leading-relaxed mb-3">
+                    前日聚餐／外食小超標 <span class="font-bold text-[#B85D3B]">(+240 kcal)</span> → 透過早餐搭配無糖豆漿＋昨日快走散步 <span class="font-bold text-[#2E6F40]">(-260 kcal)</span>，已輕鬆抵銷不囤脂！
+                </p>
+                <!-- 快速調整跨日盈餘/消耗 -->
+                <div class="flex items-center gap-2 pt-2 border-t border-[#CFE0D5]">
+                    <button onclick="adjustCrossDay(-100)" class="flex-1 bg-white/80 hover:bg-white text-[#2E6F40] border border-[#CFE0D5] rounded-xl py-1.5 text-[11px] font-bold transition">
+                        + 運動/飲食少吃 (-100)
+                    </button>
+                    <button onclick="adjustCrossDay(150)" class="flex-1 bg-white/80 hover:bg-white text-[#B85D3B] border border-[#CFE0D5] rounded-xl py-1.5 text-[11px] font-bold transition">
+                        + 聚餐/甜點盈餘 (+150)
+                    </button>
+                </div>
+            </section>
+
+            <!-- 今日執行模式切換與熱量進度 -->
+            <section class="surface-card p-4">
+                <div class="flex items-center justify-between gap-2 mb-4">
+                    <div class="text-xs font-bold text-[#232A25] flex items-center gap-1.5">
+                        <span>⚙️</span>
+                        <span>今日執行<br>模式切換</span>
+                    </div>
+                    <div class="bg-[#EBE6DD] p-1 rounded-2xl flex gap-1">
+                        <button onclick="setDayMode('rest')" id="mode-btn-rest" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-[#3B5242] text-white shadow-xs">
+                            平日辦公日<br><span class="text-[10px] font-normal opacity-90">(1,350)</span>
+                        </button>
+                        <button onclick="setDayMode('active')" id="mode-btn-active" class="px-3 py-2 rounded-xl text-xs font-bold transition text-[#68706A]">
+                            跳舞／運動日<br><span class="text-[10px] font-normal opacity-90">(1,550)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 熱量與蛋白質雙指標儀表 -->
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <!-- 熱量進度 -->
+                    <div class="bg-[#F7F5F0] border border-[#E6E1D8] rounded-2xl p-3">
+                        <div class="text-[11px] text-[#68706A] font-medium mb-1">今日已攝入 / 上限</div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="cal-consumed" class="text-2xl font-extrabold text-[#232A25]">0</span>
+                            <span class="text-xs text-[#68706A] font-semibold">/ <span id="cal-target">1,350</span></span>
+                        </div>
+                        <div class="w-full h-2 bg-[#E5E0D8] rounded-full mt-2 overflow-hidden">
+                            <div id="cal-bar" class="progress-fill h-full bg-[#3B5242] rounded-full" style="width: 0%"></div>
+                        </div>
+                        <div id="cal-remaining-text" class="text-[11px] text-[#3B5242] font-semibold mt-1.5">
+                            還可攝取 1,350 kcal
+                        </div>
+                    </div>
+
+                    <!-- 蛋白質進度 (Sophia 降體脂關鍵) -->
+                    <div class="bg-[#F7F5F0] border border-[#E6E1D8] rounded-2xl p-3">
+                        <div class="text-[11px] text-[#68706A] font-medium mb-1">蛋白質達標 (降脂關鍵)</div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="pro-consumed" class="text-2xl font-extrabold text-[#3B5242]">0</span>
+                            <span class="text-xs text-[#68706A] font-semibold">/ <span id="pro-target">90</span>g</span>
+                        </div>
+                        <div class="w-full h-2 bg-[#E5E0D8] rounded-full mt-2 overflow-hidden">
+                            <div id="pro-bar" class="progress-fill h-full bg-[#5C8368] rounded-full" style="width: 0%"></div>
+                        </div>
+                        <div id="pro-remaining-text" class="text-[11px] text-[#5C8368] font-semibold mt-1.5">
+                            還差 90g 達標
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 預估全日 TDEE 差額提示條 -->
+                <div class="bg-[#FAF9F6] border border-dashed border-[#D5CEC2] rounded-xl px-3 py-2 flex items-center justify-between text-xs">
+                    <span class="text-[#68706A]">預估今日總消耗 (TDEE + 活動)</span>
+                    <span id="tdee-display" class="font-bold text-[#3B5242]">1,620 kcal</span>
+                </div>
+            </section>
+
+            <!-- Sophia 專屬日常餐點一鍵快選配餐器 -->
+            <section class="surface-card p-4">
+                <div class="flex items-center justify-between mb-2.5">
+                    <h3 class="text-sm font-bold text-[#232A25]">🍱 Sophia 日常餐點快選</h3>
+                    <span class="text-[11px] text-[#68706A]">點擊即可加入今日紀錄</span>
+                </div>
+
+                <!-- 預設餐點標籤按鈕 -->
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="quickAddMeal('早餐店：起司蛋餅 + 無糖豆漿', 410, 20)" class="text-left p-2.5 rounded-xl bg-[#F7F5F0] hover:bg-[#EAF0EC] border border-[#E5E0D8] hover:border-[#CFE0D5] transition active:scale-[0.98]">
+                        <div class="text-xs font-bold text-[#232A25]">🥚 起司蛋餅+無糖豆漿</div>
+                        <div class="text-[11px] text-[#68706A] mt-0.5">410 kcal · <span class="text-[#3B5242] font-semibold">P 20g</span></div>
+                    </button>
+                    <button onclick="quickAddMeal('早餐店：里肌豬排蛋吐司(去美乃滋)+美式', 385, 23)" class="text-left p-2.5 rounded-xl bg-[#F7F5F0] hover:bg-[#EAF0EC] border border-[#E5E0D8] hover:border-[#CFE0D5] transition active:scale-[0.98]">
+                        <div class="text-xs font-bold text-[#232A25]">🥪 豬排蛋吐司+冰美式</div>
+                        <div class="text-[11px] text-[#68706A] mt-0.5">385 kcal · <span class="text-[#3B5242] font-semibold">P 23g</span></div>
+                    </button>
+                    <button onclick="quickAddMeal('在家煮：家常麵 + 燙青菜 + 兩顆蛋', 430, 21)" class="text-left p-2.5 rounded-xl bg-[#F7F5F0] hover:bg-[#EAF0EC] border border-[#E5E0D8] hover:border-[#CFE0D5] transition active:scale-[0.98]">
+                        <div class="text-xs font-bold text-[#232A25]">🍜 在家煮麵+青菜+2蛋</div>
+                        <div class="text-[11px] text-[#68706A] mt-0.5">430 kcal · <span class="text-[#3B5242] font-semibold">P 21g</span></div>
+                    </button>
+                    <button onclick="quickAddMeal('午餐：舒肥雞胸健康餐盒(半飯)', 510, 36)" class="text-left p-2.5 rounded-xl bg-[#F7F5F0] hover:bg-[#EAF0EC] border border-[#E5E0D8] hover:border-[#CFE0D5] transition active:scale-[0.98]">
+                        <div class="text-xs font-bold text-[#232A25]">🥗 舒肥雞胸健康餐盒</div>
+                        <div class="text-[11px] text-[#68706A] mt-0.5">510 kcal · <span class="text-[#3B5242] font-semibold">P 36g</span></div>
+                    </button>
+                    <button onclick="quickAddMeal('午餐：自助餐一主菜兩青菜+半碗飯', 540, 27)" class="text-left p-2.5 rounded-xl bg-[#F7F5F0] hover:bg-[#EAF0EC] border border-[#E5E0D8] hover:border-[#CFE0D5] transition active:scale-[0.98]">
+                        <div class="text-xs font-bold text-[#232A25]">🍱 自助餐1肉2菜半飯</div>
+                        <div class="text-[11px] text-[#68706A] mt-0.5">540 kcal · <span class="text-[#3B5242] font-semibold">P 27g</span></div>
+                    </button>
+                    <button onclick="quickAddMeal('下午茶：無糖拿鐵 / 希臘優格 / 茶葉蛋', 150, 12)" class="text-left p-2.5 rounded-xl bg-[#F7F5F0] hover:bg-[#EAF0EC] border border-[#E5E0D8] hover:border-[#CFE0D5] transition active:scale-[0.98]">
+                        <div class="text-xs font-bold text-[#232A25]">☕ 無糖拿鐵 / 優格蛋</div>
+                        <div class="text-[11px] text-[#68706A] mt-0.5">150 kcal · <span class="text-[#3B5242] font-semibold">P 12g</span></div>
+                    </button>
+                </div>
+
+                <!-- 自訂輸入食物列 -->
+                <div class="bg-[#F7F5F0] p-3 rounded-2xl border border-[#E5E0D8] mb-4">
+                    <div class="text-xs font-bold text-[#3B5242] mb-2">➕ 自訂其他餐點或飲料</div>
+                    <div class="grid grid-cols-12 gap-1.5">
+                        <input type="text" id="custom-meal-name" placeholder="品項 (例: 拿鐵)" class="col-span-5 px-2.5 py-2 rounded-xl bg-white border border-[#E5E0D8] text-xs focus:outline-none focus:border-[#3B5242]">
+                        <input type="number" id="custom-meal-kcal" placeholder="熱量 kcal" class="col-span-3 px-2 py-2 rounded-xl bg-white border border-[#E5E0D8] text-xs focus:outline-none focus:border-[#3B5242]">
+                        <input type="number" id="custom-meal-pro" placeholder="蛋白 g" class="col-span-2 px-2 py-2 rounded-xl bg-white border border-[#E5E0D8] text-xs focus:outline-none focus:border-[#3B5242]">
+                        <button onclick="addCustomMeal()" class="col-span-2 bg-[#3B5242] text-white rounded-xl text-xs font-bold hover:bg-[#2C3E32] transition">加入</button>
+                    </div>
+                </div>
+
+                <!-- 今日已吃清單 -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-[#232A25]">📝 今日飲食清單</span>
+                        <button onclick="clearTodayMeals()" class="text-[11px] text-[#8E6E5D] hover:underline">清空今日紀錄</button>
+                    </div>
+                    <div id="meal-list" class="space-y-2">
+                        <!-- 由 JS 動態渲染 -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- 給 Sophia 的專屬營養師小叮嚀 -->
+            <section class="bg-[#F2EFE9] border border-[#E2DDD3] rounded-2xl p-3.5 text-xs text-[#4B544E] leading-relaxed">
+                <div class="font-bold text-[#3B5242] mb-1">💡 給 Sophia 的體脂優化小撇步：</div>
+                早上 9 點在公司吃早餐店時，只要把「大冰奶／含糖紅茶」換成<strong>無糖豆漿或無糖鮮奶茶</strong>，在家煮麵時固定加<strong>兩顆蛋與一把青菜</strong>，每天就能輕鬆多攝取 15–20g 優質蛋白，跳舞後的肌肉線條會更明顯！
+            </section>
+        </main>
+
+        <!-- ==================== 分頁 2：7日體重與體態藍圖 ==================== -->
+        <main id="panel-trend" class="tab-panel hidden space-y-4">
+            <section class="surface-card p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h2 class="text-sm font-bold text-[#232A25]">📈 近 7 日空腹體重走勢 (kg)</h2>
+                        <p class="text-[11px] text-[#68706A]">目標區間：47.5 – 48.0 kg（緩降不復胖）</p>
+                    </div>
+                    <button onclick="openWeightModal()" class="bg-[#3B5242] text-white text-xs font-bold px-3 py-1.5 rounded-xl">
+                        + 記錄今日
+                    </button>
+                </div>
+
+                <!-- 響應式 SVG 折線圖容器 -->
+                <div class="bg-[#F7F5F0] border border-[#E5E0D8] rounded-2xl p-3 mb-3">
+                    <svg id="weight-chart-svg" class="w-full h-44 overflow-visible" viewBox="0 0 360 160"></svg>
+                </div>
+
+                <!-- 體態里程碑進度條 -->
+                <div class="bg-[#EAF0EC] border border-[#CFE0D5] rounded-2xl p-3.5">
+                    <div class="flex justify-between text-xs font-bold text-[#233329] mb-1.5">
+                        <span>體態雕塑里程碑 (49.5 → 47.8 kg)</span>
+                        <span id="milestone-pct">30%</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-white rounded-full overflow-hidden mb-2">
+                        <div id="milestone-bar" class="h-full bg-[#3B5242] rounded-full transition-all duration-500" style="width: 30%"></div>
+                    </div>
+                    <p class="text-[11px] text-[#34463B] leading-relaxed">
+                        你目前的體重已經非常輕盈，體重計上的數字只是參考；建議每 2 週拍一次鏡子紀錄腰線與手臂緊實度，比天天量體重更有成就感！
+                    </p>
+                </div>
+            </section>
+
+            <!-- 最近體重紀錄列表 -->
+            <section class="surface-card p-4">
+                <h3 class="text-xs font-bold text-[#232A25] mb-2.5">🗓️ 近期體重紀錄明細</h3>
+                <div id="weight-history-list" class="space-y-2">
+                    <!-- JS 動態生成 -->
+                </div>
+            </section>
+        </main>
+
+        <!-- ==================== 分頁 3：舞蹈瑜珈與活動表現 ==================== -->
+        <main id="panel-workout" class="tab-panel hidden space-y-4">
+            <section class="surface-card p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <h2 class="text-sm font-bold text-[#232A25]">💃 Sophia 專屬輕運動與舞蹈課表</h2>
+                        <p class="text-[11px] text-[#68706A]">勾選今日完成的活動，系統將自動增加今日消耗額度</p>
+                    </div>
+                    <div class="bg-[#EAF0EC] text-[#3B5242] px-2.5 py-1 rounded-xl text-xs font-bold">
+                        +<span id="workout-bonus-kcal">0</span> kcal
+                    </div>
+                </div>
+
+                <div id="workout-list" class="space-y-2.5 mt-3">
+                    <!-- JS 動態生成 -->
+                </div>
+            </section>
+
+            <section class="mint-card p-4 text-xs text-[#2E3F34] leading-relaxed">
+                <div class="font-bold text-[#233329] mb-1">✨ 舞蹈＋瑜珈的黃金組合效益</div>
+                跳舞屬於極佳的心肺與全身協調燃脂運動，而瑜珈能幫助久坐辦公室的骨盆與核心歸位、拉長肌肉線條。一週只要有 <strong>2–3 天有活動到</strong>，搭配足夠蛋白質，體脂率就能穩穩往下掉！
+            </section>
+        </main>
+
+        <!-- ==================== 分頁 4：一鍵生成日報小卡 ==================== -->
+        <main id="panel-report" class="tab-panel hidden space-y-4">
+            <section class="surface-card p-4">
+                <h2 class="text-sm font-bold text-[#232A25] mb-1">📱 今日體態與飲食打卡小卡</h2>
+                <p class="text-[11px] text-[#68706A] mb-3">可一鍵複製文字貼到 Threads、LINE 或手機備忘錄紀錄</p>
+
+                <!-- 預覽小卡 -->
+                <div id="report-preview-card" class="bg-gradient-to-br from-[#3B5242] to-[#2C3E32] text-[#FAF9F6] rounded-2xl p-4 shadow-md mb-3.5 font-sans">
+                    <div class="flex justify-between items-center border-b border-white/15 pb-2.5 mb-3">
+                        <span class="text-xs font-bold tracking-wider">🌿 SOPHIA'S DAILY LOG</span>
+                        <span id="report-date" class="text-xs text-[#B8D4C2]">2026/11/27</span>
+                    </div>
+                    <pre id="report-text-content" class="whitespace-pre-wrap font-sans text-xs leading-relaxed text-[#F2F6F3]"></pre>
+                </div>
+
+                <button onclick="copyDailyReport()" class="w-full py-3 rounded-2xl bg-[#3B5242] hover:bg-[#2C3E32] text-white text-xs font-bold shadow-sm transition flex items-center justify-center gap-2 active:scale-[0.99]">
+                    <span>📋 一鍵複製今日日報文字</span>
+                </button>
+            </section>
+
+            <!-- 底部資料重置選項 -->
+            <div class="text-center pt-2">
+                <button onclick="resetAllToDefault()" class="text-[11px] text-[#8A928C] hover:text-[#3B5242] underline">
+                    恢復初始範例數據
+                </button>
+            </div>
+        </main>
+
+    </div>
+
+    <script>
+        // ==================== 1. 狀態初始化與預設資料 ====================
+        const STORAGE_KEY = 'sophia_wellness_dashboard_v1';
+
+        const defaultState = {
+            heightCm: 162,
+            weight: 49.0,
+            targetWeight: 47.8,
+            bodyFat: 31.0,
+            dayMode: 'rest', // 'rest' (1350 kcal / 90g P) 或 'active' (1550 kcal / 95g P)
+            crossDayBalance: -20, // 負數代表已結清/倒賺熱量赤字，正數代表還有盈餘待平衡
+            meals: [
+                { id: 1, name: '早餐店：起司蛋餅 + 無糖豆漿', kcal: 410, pro: 20, time: '09:15' },
+                { id: 2, name: '午餐：舒肥雞胸健康餐盒(半飯)', kcal: 510, pro: 36, time: '12:40' }
+            ],
+            workouts: [
+                { id: 'd1', title: 'D1 · 舞蹈課練習 (60分鐘)', desc: '全身有氧燃脂＋律動協調', kcal: 300, done: false },
+                { id: 'd2', title: 'D2 · 伸展瑜珈 / 核心喚醒 (30分鐘)', desc: '改善久坐緊繃、雕塑腰腹線條', kcal: 110, done: true },
+                { id: 'd3', title: 'D3 · 通勤快走 / 飯後散步 (30分鐘)', desc: '穩定餐後血糖、輕鬆提升日消耗', kcal: 120, done: false },
+                { id: 'd4', title: 'D4 · 居家核心與臀腿塑形 (20分鐘)', desc: '無器材徒手訓練、提升基礎代謝', kcal: 100, done: false }
+            ],
+            weightHistory: [
+                { date: '11/21', weight: 49.5 },
+                { date: '11/22', weight: 49.3 },
+                { date: '11/23', weight: 49.4 },
+                { date: '11/24', weight: 49.1 },
+                { date: '11/25', weight: 49.2 },
+                { date: '11/26', weight: 49.1 },
+                { date: '11/27', weight: 49.0 }
+            ]
+        };
+
+        let state = loadState();
+
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    return { ...defaultState, ...JSON.parse(saved) };
+                }
+            } catch (e) {
+                console.warn('無法讀取本機儲存資料，使用預設值', e);
+            }
+            return JSON.parse(JSON.stringify(defaultState));
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {
+                console.warn('無法儲存至本機', e);
+            }
+        }
+
+        // ==================== 2. 日期與頂部 Hero 區塊渲染 ====================
+        function initDate() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const weekDays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+            const weekStr = weekDays[now.getDay()];
+
+            const dateStr = `${year}/${month}/${day}`;
+            document.getElementById('header-date').textContent = dateStr;
+            document.getElementById('header-day').textContent = `${weekStr} · 體態雕塑模式`;
+            document.getElementById('report-date').textContent = `${dateStr} (${weekStr})`;
+        }
+
+        function renderHero() {
+            const w = Number(state.weight);
+            const hMeters = state.heightCm / 100;
+            const bmi = (w / (hMeters * hMeters)).toFixed(1);
+            const diffToGoal = (w - state.targetWeight).toFixed(1);
+
+            document.getElementById('hero-weight').textContent = w.toFixed(1);
+            document.getElementById('hero-bf').textContent = `${Number(state.bodyFat).toFixed(1)}%`;
+            document.getElementById('hero-bmi').textContent = bmi;
+
+            const diffEl = document.getElementById('hero-diff');
+            if (diffToGoal > 0) {
+                diffEl.textContent = `(距目標 47.8 差 ${diffToGoal} kg)`;
+            } else {
+                diffEl.textContent = `🎉 已達成理想體重區間！`;
+            }
+        }
+
+        // ==================== 3. 今日結算、模式切換與配餐邏輯 ====================
+        function setDayMode(mode) {
+            state.dayMode = mode;
+            saveState();
+            renderDailySection();
+            showToast(mode === 'active' ? '已切換為「跳舞／運動日」額度' : '已切換為「平日辦公日」額度', '⚙️');
+        }
+
+        function adjustCrossDay(delta) {
+            state.crossDayBalance += delta;
+            saveState();
+            renderCrossDay();
+            showToast(delta < 0 ? `已記錄熱量赤字 ${delta} kcal` : `已記錄聚餐盈餘 +${delta} kcal`, '🍃');
+        }
+
+        function renderCrossDay() {
+            const badge = document.getElementById('balance-badge');
+            const desc = document.getElementById('balance-desc');
+            const val = state.crossDayBalance;
+
+            if (val <= 0) {
+                badge.textContent = `淨平衡 ${val} kcal ✓`;
+                badge.className = 'bg-[#3B5242] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-xl shrink-0';
+                desc.innerHTML = `前日聚餐小超標已透過日常飲食微調與活動<strong>徹底結清（淨倒賺 ${Math.abs(val)} kcal）</strong>，保持節奏不囤脂！`;
+            } else {
+                badge.textContent = `待平衡 +${val} kcal`;
+                badge.className = 'bg-[#B86B4B] text-white text-[11px] font-bold px-2.5 py-1.5 rounded-xl shrink-0';
+                desc.innerHTML = `近期有 <strong>+${val} kcal</strong> 聚餐小盈餘，接下來 1–2 天只要早餐飲料選無糖＋散步 30 分鐘就能輕鬆平衡回來！`;
+            }
+        }
+
+        function quickAddMeal(name, kcal, pro) {
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            state.meals.push({
+                id: Date.now(),
+                name,
+                kcal: Number(kcal),
+                pro: Number(pro),
+                time: timeStr
+            });
+            saveState();
+            renderDailySection();
+            showToast(`已加入：${name.split('：')[1] || name}`, '🥗');
+        }
+
+        function addCustomMeal() {
+            const nameInput = document.getElementById('custom-meal-name');
+            const kcalInput = document.getElementById('custom-meal-kcal');
+            const proInput = document.getElementById('custom-meal-pro');
+
+            const name = nameInput.value.trim();
+            const kcal = parseInt(kcalInput.value, 10);
+            const pro = parseInt(proInput.value, 10) || 0;
+
+            if (!name || isNaN(kcal) || kcal <= 0) {
+                showToast('請輸入餐點名稱與正確熱量喔！', '⚠️');
+                return;
+            }
+
+            quickAddMeal(name, kcal, pro);
+            nameInput.value = '';
+            kcalInput.value = '';
+            proInput.value = '';
+        }
+
+        function deleteMeal(id) {
+            state.meals = state.meals.filter(m => m.id !== id);
+            saveState();
+            renderDailySection();
+            showToast('已移除該筆飲食紀錄', '🗑️');
+        }
+
+        function clearTodayMeals() {
+            state.meals = [];
+            saveState();
+            renderDailySection();
+            showToast('已清空今日飲食清單', '✨');
+        }
+
+        function renderDailySection() {
+            // 1. 更新模式按鈕樣式
+            const restBtn = document.getElementById('mode-btn-rest');
+            const activeBtn = document.getElementById('mode-btn-active');
+
+            if (state.dayMode === 'rest') {
+                restBtn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition bg-[#3B5242] text-white shadow-xs';
+                activeBtn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition text-[#68706A] hover:text-[#232A25]';
+            } else {
+                activeBtn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition bg-[#3B5242] text-white shadow-xs';
+                restBtn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition text-[#68706A] hover:text-[#232A25]';
+            }
+
+            // 2. 計算今日目標與已攝取總量
+            const targetKcal = state.dayMode === 'active' ? 1550 : 1350;
+            const targetPro = state.dayMode === 'active' ? 95 : 90;
+
+            const totalKcal = state.meals.reduce((sum, item) => sum + item.kcal, 0);
+            const totalPro = state.meals.reduce((sum, item) => sum + item.pro, 0);
+
+            // 計算今日勾選運動消耗
+            const workoutBonus = state.workouts.filter(w => w.done).reduce((sum, w) => sum + w.kcal, 0);
+            const estimatedTDEE = 1520 + workoutBonus;
+
+            document.getElementById('cal-consumed').textContent = totalKcal.toLocaleString();
+            document.getElementById('cal-target').textContent = targetKcal.toLocaleString();
+            document.getElementById('pro-consumed').textContent = totalPro;
+            document.getElementById('pro-target').textContent = targetPro;
+            document.getElementById('tdee-display').textContent = `${estimatedTDEE.toLocaleString()} kcal`;
+
+            // 進度條百分比
+            const calPct = Math.min(100, Math.round((totalKcal / targetKcal) * 100));
+            const proPct = Math.min(100, Math.round((totalPro / targetPro) * 100));
+
+            const calBar = document.getElementById('cal-bar');
+            calBar.style.width = `${calPct}%`;
+            calBar.style.backgroundColor = totalKcal > targetKcal ? '#B86B4B' : '#3B5242';
+
+            document.getElementById('pro-bar').style.width = `${proPct}%`;
+
+            // 剩餘文字提示
+            const calRem = targetKcal - totalKcal;
+            const calRemEl = document.getElementById('cal-remaining-text');
+            if (calRem >= 0) {
+                calRemEl.textContent = `還可攝取 ${calRem} kcal`;
+                calRemEl.className = 'text-[11px] text-[#3B5242] font-semibold mt-1.5';
+            } else {
+                calRemEl.textContent = `超出目標 ${Math.abs(calRem)} kcal`;
+                calRemEl.className = 'text-[11px] text-[#B86B4B] font-semibold mt-1.5';
+            }
+
+            const proRem = targetPro - totalPro;
+            const proRemEl = document.getElementById('pro-remaining-text');
+            if (proRem > 0) {
+                proRemEl.textContent = `還差 ${proRem}g 達標`;
+            } else {
+                proRemEl.textContent = `🎉 蛋白質已達標！`;
+            }
+
+            // 3. 渲染今日已吃清單
+            const listEl = document.getElementById('meal-list');
+            if (state.meals.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-4 text-xs text-[#8A928C] bg-[#F7F5F0] rounded-xl">尚未紀錄今日餐點，點擊上方按鈕快速新增吧！</div>`;
+            } else {
+                listEl.innerHTML = state.meals.map(meal => `
+                    <div class="flex items-center justify-between bg-[#F7F5F0] border border-[#E6E1D8] rounded-xl px-3 py-2.5">
+                        <div class="pr-2">
+                            <div class="text-xs font-bold text-[#232A25]">${meal.name}</div>
+                            <div class="text-[11px] text-[#68706A] mt-0.5">
+                                <span class="text-[#8A928C] mr-1.5">${meal.time}</span>
+                                <span class="font-semibold text-[#232A25]">${meal.kcal} kcal</span> · 
+                                <span class="font-semibold text-[#3B5242]">蛋白質 ${meal.pro}g</span>
+                            </div>
+                        </div>
+                        <button onclick="deleteMeal(${meal.id})" class="w-7 h-7 rounded-lg bg-white border border-[#E5E0D8] text-[#8A928C] hover:text-[#B86B4B] flex items-center justify-center text-xs shrink-0" title="刪除">
+                            ✕
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            renderCrossDay();
+            renderReportPreview();
+        }
+
+        // ==================== 4. 體重趨勢圖與彈窗更新 ====================
+        function openWeightModal() {
+            document.getElementById('modal-weight-input').value = state.weight;
+            document.getElementById('modal-bf-input').value = state.bodyFat;
+            const modal = document.getElementById('weight-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeWeightModal() {
+            const modal = document.getElementById('weight-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveWeightFromModal() {
+            const wVal = parseFloat(document.getElementById('modal-weight-input').value);
+            const bfVal = parseFloat(document.getElementById('modal-bf-input').value);
+
+            if (isNaN(wVal) || wVal < 30 || wVal > 120) {
+                showToast('請輸入有效的體重數字喔！', '⚠️');
+                return;
+            }
+
+            state.weight = Number(wVal.toFixed(1));
+            if (!isNaN(bfVal) && bfVal > 5 && bfVal < 60) {
+                state.bodyFat = Number(bfVal.toFixed(1));
+            }
+
+            // 更新今日趨勢圖最後一筆
+            const now = new Date();
+            const todayLabel = `${now.getMonth() + 1}/${now.getDate()}`;
+            const lastEntry = state.weightHistory[state.weightHistory.length - 1];
+            if (lastEntry && lastEntry.date === todayLabel) {
+                lastEntry.weight = state.weight;
+            } else {
+                state.weightHistory.push({ date: todayLabel, weight: state.weight });
+                if (state.weightHistory.length > 7) state.weightHistory.shift();
+            }
+
+            saveState();
+            renderHero();
+            renderWeightTrend();
+            renderReportPreview();
+            closeWeightModal();
+            showToast(`體態數據已更新為 ${state.weight} kg`, '⚖️');
+        }
+
+        function renderWeightTrend() {
+            const svg = document.getElementById('weight-chart-svg');
+            const data = state.weightHistory;
+            if (!data || data.length === 0) return;
+
+            const weights = data.map(d => d.weight);
+            const minW = Math.min(...weights, 47.8) - 0.3;
+            const maxW = Math.max(...weights, 49.6) + 0.3;
+            const range = maxW - minW || 1;
+
+            const padLeft = 28;
+            const padRight = 20;
+            const padTop = 22;
+            const padBottom = 26;
+            const width = 360 - padLeft - padRight;
+            const height = 160 - padTop - padBottom;
+
+            const points = data.map((d, i) => {
+                const x = padLeft + (i / Math.max(1, data.length - 1)) * width;
+                const y = padTop + height - ((d.weight - minW) / range) * height;
+                return { x, y, ...d };
+            });
+
+            // 目標線 (47.8 kg) Y 座標
+            const goalY = padTop + height - ((47.8 - minW) / range) * height;
+
+            const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+            const areaPoints = `${points[0].x},${padTop + height} ${polylinePoints} ${points[points.length - 1].x},${padTop + height}`;
+
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#3B5242" stop-opacity="0.22" />
+                        <stop offset="100%" stop-color="#3B5242" stop-opacity="0.0" />
+                    </linearGradient>
+                </defs>
+                <!-- 目標虛線 -->
+                <line x1="${padLeft}" y1="${goalY}" x2="${360 - padRight}" y2="${goalY}" stroke="#84A58E" stroke-width="1.2" stroke-dasharray="4 3" />
+                <text x="${360 - padRight}" y="${goalY - 4}" text-anchor="end" fill="#52735C" font-size="9" font-weight="600">目標 47.8kg</text>
+
+                <!-- 漸層填充 -->
+                <polygon points="${areaPoints}" fill="url(#areaGrad)" />
+
+                <!-- 折線 -->
+                <polyline fill="none" stroke="#3B5242" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${polylinePoints}" />
+
+                <!-- 資料點與標籤 -->
+                ${points.map((p, idx) => `
+                    <circle cx="${p.x}" cy="${p.y}" r="${idx === points.length - 1 ? 5 : 3.5}" fill="${idx === points.length - 1 ? '#3B5242' : '#FAF9F6'}" stroke="#3B5242" stroke-width="2" />
+                    <text x="${p.x}" y="${p.y - 8}" text-anchor="middle" fill="#232A25" font-size="10" font-weight="700">${p.weight.toFixed(1)}</text>
+                    <text x="${p.x}" y="${152}" text-anchor="middle" fill="#68706A" font-size="9.5">${p.date}</text>
+                `).join('')}
+            `;
+
+            // 更新里程碑進度條 (起點 49.5 -> 目標 47.8)
+            const startW = 49.5;
+            const progress = Math.max(5, Math.min(100, Math.round(((startW - state.weight) / (startW - state.targetWeight)) * 100)));
+            document.getElementById('milestone-pct').textContent = `${progress}%`;
+            document.getElementById('milestone-bar').style.width = `${progress}%`;
+
+            // 渲染歷史列表
+            const histList = document.getElementById('weight-history-list');
+            histList.innerHTML = [...data].reverse().map(item => `
+                <div class="flex items-center justify-between bg-[#F7F5F0] px-3 py-2 rounded-xl border border-[#E6E1D8] text-xs">
+                    <span class="font-medium text-[#68706A]">${item.date} 空腹紀錄</span>
+                    <span class="font-bold text-[#232A25]">${item.weight.toFixed(1)} kg</span>
+                </div>
+            `).join('');
+        }
+
+        // ==================== 5. 運動與舞蹈表現模組 ====================
+        function toggleWorkout(id) {
+            const item = state.workouts.find(w => w.id === id);
+            if (item) {
+                item.done = !item.done;
+                saveState();
+                renderWorkouts();
+                renderDailySection();
+                showToast(item.done ? `完成運動！額外消耗 +${item.kcal} kcal` : '已取消勾選該項活動', item.done ? '💃' : '↩️');
+            }
+        }
+
+        function renderWorkouts() {
+            const list = document.getElementById('workout-list');
+            const totalBonus = state.workouts.filter(w => w.done).reduce((sum, w) => sum + w.kcal, 0);
+            document.getElementById('workout-bonus-kcal').textContent = totalBonus;
+
+            list.innerHTML = state.workouts.map(w => `
+                <div onclick="toggleWorkout('${w.id}')" class="cursor-pointer p-3.5 rounded-2xl border transition flex items-center justify-between gap-3 ${w.done ? 'bg-[#EAF0EC] border-[#3B5242]' : 'bg-[#F7F5F0] border-[#E5E0D8] hover:border-[#C5BEB2]'}">
+                    <div>
+                        <div class="text-xs font-bold ${w.done ? 'text-[#233329]' : 'text-[#232A25]'}">${w.title}</div>
+                        <div class="text-[11px] text-[#68706A] mt-0.5">${w.desc} · 預估消耗 <span class="font-semibold text-[#3B5242]">${w.kcal} kcal</span></div>
+                    </div>
+                    <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${w.done ? 'bg-[#3B5242] text-white' : 'bg-white border border-[#D5CEC2] text-transparent'}">
+                        ✓
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ==================== 6. 一鍵生成日報小卡 ====================
+        function renderReportPreview() {
+            const targetKcal = state.dayMode === 'active' ? 1550 : 1350;
+            const targetPro = state.dayMode === 'active' ? 95 : 90;
+            const totalKcal = state.meals.reduce((sum, item) => sum + item.kcal, 0);
+            const totalPro = state.meals.reduce((sum, item) => sum + item.pro, 0);
+            const doneWorkouts = state.workouts.filter(w => w.done).map(w => w.title.split('·')[1].trim());
+            const workoutSummary = doneWorkouts.length > 0 ? doneWorkouts.join('、') : '今日休息日（注重飲食與伸展）';
+
+            const reportText = [
+                `⚖️ 空腹體態：${state.weight.toFixed(1)} kg ｜ 體脂 ${Number(state.bodyFat).toFixed(1)}%`,
+                `🎯 今日模式：${state.dayMode === 'active' ? '💃 跳舞／運動日' : '🌿 平日辦公日'}`,
+                `🥗 飲食結算：${totalKcal} / ${targetKcal} kcal`,
+                `🥚 蛋白質達標：${totalPro}g / ${targetPro}g ${totalPro >= targetPro ? '✅' : '💪'}`,
+                `✨ 今日活動：${workoutSummary}`,
+                `💬 狀態備註：穩定攝取蛋白質，朝緊實線條前進！`
+            ].join('\n');
+
+            document.getElementById('report-text-content').textContent = reportText;
+        }
+
+        function copyDailyReport() {
+            const headerDate = document.getElementById('report-date').textContent;
+            const bodyText = document.getElementById('report-text-content').textContent;
+            const fullText = `🌿 SOPHIA 體態雕塑與健康飲食日報 (${headerDate})\n${bodyText}`;
+
+            // 使用 textarea + execCommand 相容所有 iframe 環境
+            const textarea = document.createElement('textarea');
+            textarea.value = fullText;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('已複製日報小卡！可直接貼上分享', '📋');
+            } catch (err) {
+                showToast('複製失敗，請手動選取文字複製', '⚠️');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        // ==================== 7. 頁籤切換與工具函式 ====================
+        function switchTab(tabName) {
+            const tabs = ['daily', 'trend', 'workout', 'report'];
+            tabs.forEach(t => {
+                const panel = document.getElementById(`panel-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabName) {
+                    panel.classList.remove('hidden');
+                    btn.className = 'tab-btn active bg-[#FAF9F6] text-[#232A25] shadow-xs rounded-xl py-2 px-1 text-center transition font-bold';
+                } else {
+                    panel.classList.add('hidden');
+                    btn.className = 'tab-btn text-[#68706A] hover:text-[#232A25] rounded-xl py-2 px-1 text-center transition font-semibold';
+                }
+            });
+
+            if (tabName === 'trend') renderWeightTrend();
+            if (tabName === 'report') renderReportPreview();
+        }
+
+        let toastTimer = null;
+        function showToast(msg, icon = '✨') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            document.getElementById('toast-icon').textContent = icon;
+
+            toast.classList.remove('opacity-0', '-translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-2');
+            }, 2200);
+        }
+
+        function resetAllToDefault() {
+            state = JSON.parse(JSON.stringify(defaultState));
+            saveState();
+            renderHero();
+            renderDailySection();
+            renderWeightTrend();
+            renderWorkouts();
+            showToast('已恢復初始範例設定', '🔄');
+        }
+
+        // 啟動初始化
+        window.onload = function () {
+            initDate();
+            renderHero();
+            renderDailySection();
+            renderWeightTrend();
+            renderWorkouts();
+        };
+    </script>
+</body>
+</html>
